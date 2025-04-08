@@ -1,35 +1,68 @@
 from django.core.management.base import BaseCommand
 from octofit_tracker.test_data import get_test_data
-from pymongo import MongoClient
-from django.conf import settings
+from octofit_tracker.models import User, Team, Activity, Leaderboard, Workout
+from bson import ObjectId
 
 class Command(BaseCommand):
-    help = 'Populate the database with test data for users, teams, activity, leaderboard, and workouts.'
+    help = 'Populate the database with test data for users, teams, activities, leaderboard, and workouts'
 
     def handle(self, *args, **kwargs):
-        # Connect to MongoDB
-        client = MongoClient(settings.DATABASES['default']['HOST'], settings.DATABASES['default']['PORT'])
-        db = client[settings.DATABASES['default']['NAME']]
-
-        # Drop existing collections
-        db.users.drop()
-        db.teams.drop()
-        db.activity.drop()
-        db.leaderboard.drop()
-        db.workouts.drop()
+        # Clear existing data
+        User.objects.all().delete()
+        Team.objects.all().delete()
+        Activity.objects.all().delete()
+        Leaderboard.objects.all().delete()
+        Workout.objects.all().delete()
 
         # Get test data
-        test_data = get_test_data()
+        data = get_test_data()
 
-        # Convert timedelta objects to total seconds for MongoDB compatibility
-        for activity in test_data['activities']:
-            activity['duration'] = activity['duration'].total_seconds()
+        # Populate users
+        users = []
+        for user_data in data['users']:
+            user = User(
+                _id=user_data['_id'],
+                username=user_data['username'],
+                email=user_data['email'],
+                password=user_data['password']
+            )
+            user.save()
+            users.append(user)
 
-        # Insert test data into collections
-        db.users.insert_many(test_data['users'])
-        db.teams.insert_many(test_data['teams'])
-        db.activity.insert_many(test_data['activities'])
-        db.leaderboard.insert_many(test_data['leaderboard'])
-        db.workouts.insert_many(test_data['workouts'])
+        # Populate teams
+        for team_data in data['teams']:
+            team = Team(
+                _id=team_data['_id'],
+                name=team_data['name']
+            )
+            team.save()
+
+        # Populate activities
+        for activity_data in data['activities']:
+            activity = Activity(
+                _id=activity_data['_id'],
+                user=None,  # Assign users later if needed
+                activity_type=activity_data['activity_type'],
+                duration=activity_data['duration']
+            )
+            activity.save()
+
+        # Populate leaderboard
+        for leaderboard_data in data['leaderboard']:
+            leaderboard = Leaderboard(
+                _id=leaderboard_data['_id'],
+                user=None,  # Assign users later if needed
+                score=leaderboard_data['score']
+            )
+            leaderboard.save()
+
+        # Populate workouts
+        for workout_data in data['workouts']:
+            workout = Workout(
+                _id=workout_data['_id'],
+                name=workout_data['name'],
+                description=workout_data['description']
+            )
+            workout.save()
 
         self.stdout.write(self.style.SUCCESS('Successfully populated the database with test data.'))
